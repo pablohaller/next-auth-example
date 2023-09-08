@@ -1,34 +1,90 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Next Auth Example with Google Provider
 
-## Getting Started
+Made with **Next 13** and using **app router**.
 
-First, run the development server:
+## 1. Setup Local Environment Variables
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
+```
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+NEXTAUTH_URL=
+NEXTAUTH_SECRET=
+JWT_SECRET_KEY=
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+To generate keys, the following site can be a good option:
+https://generate-secret.vercel.app/32
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 2. Setup auth route
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+File under `api/auth/[...nextauth]/route.ts`.
+This file serves as configuration for NextAuth, setting up the provider (Google, but could be anyone listed on the page or own credentials). Also, more providers can be added (Github, Discord, etc).
 
-## Learn More
+```
+ providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code"
+        }
+      }
+    }),
+    // ... any other provider that you need
+  ],
+```
 
-To learn more about Next.js, take a look at the following resources:
+It also uses callbacks to setup JWT tokens based on information we get from the provider:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+callbacks: {
+    async signIn({ user, account }: any) {
+      // Possibility to check for information of the user and really look for authorization
+      console.log(user, account)
+      return true;
+    },
+    async jwt({ token, user, account }: any) {
+      // Create the token
+      console.log(user, token, account);
+      if (account) {
+        const signedToken = await SignToken(user?.email as string);
+        token.userToken = signedToken;
+      }
+      return token;
+    },
+    async session({ session, token, user }: any) {
+      // Save the token in session
+      session.loggedUser = token.userToken;
+      return session;
+    },
+  },
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+## 3. Add provider
 
-## Deploy on Vercel
+The application must be wrapped with a NextAuth provider to embed the application with its functionalities.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This can be seen in the main page layout (`layout.tsx`) under the `app` folder; children from the layout are wrapped with the `Providers.tsx` component.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+## 4. Add middleware
+
+Middleware catches all routes and identifies if there is a session or not; more stuff can be done here using the middleware function, but this is enough to protect all routes that fall under dashboard.
+
+## 5. Testing the login
+
+Trying to access `/dashboard` directly or going to `http://localhost:3000/api/auth/signin`.
+
+## 6. Resources
+
+- https://next-auth.js.org/tutorials/securing-pages-and-api-routes
+- https://next-auth.js.org/configuration/callbacks
+- https://next-auth.js.org/configuration/providers/oauth
+- https://next-auth.js.org/providers/google
+- https://next-auth.js.org/getting-started/example
+- https://next-auth.js.org/configuration/initialization#route-handlers-app
+- https://dev.to/ifennamonanu/building-google-jwt-authentication-with-nextauth-5g78
+- https://www.youtube.com/watch?v=6N3Rumo-c3s
+- https://github.com/Godsont/Google-Authentication
